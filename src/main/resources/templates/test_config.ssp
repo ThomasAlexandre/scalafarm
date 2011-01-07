@@ -1,0 +1,14 @@
+<%@ val environment:String %>
+<%@ val database:String %>
+<%@ val datasets:List[String] %>
+<%@ val persistenceUnit:String %>
+#import(se.ta.scalafarm.util.StringUtil.getAsCommaSeparatedStrings)
+environment="${environment}"
+environments {
+  ${environment} {
+     database="${database}"
+     datasets=[${getAsCommaSeparatedStrings(datasets)}]
+     persistence_unit="${persistenceUnit}"
+  }
+}
+

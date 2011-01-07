@@ -1,0 +1,19 @@
+-@ val outputPackageBase: String ="defaultpackage"
+-@ val datasets: List[String] = Nil
+!!! XML
+
+%entity-mappings{
+  :xmlns => "http://java.sun.com/xml/ns/persistence/orm", 
+  "xmlns:xsi" => "http://www.w3.org/2001/XMLSchema-instance", 
+  "xsi:schemaLocation" => "http://java.sun.com/xml/ns/persistence/orm http://java.sun.com/xml/ns/persistence/orm_1_0.xsd", 
+  :version => "1.0"}
+  %package
+    #{outputPackageBase}.model
+
+  = datasets.foreach
+    - elem => 
+      %entity(class=
+        {elem})
+        %named-query(name="findAll#{elem}s")
+          %query
+            <![CDATA[from #{elem} a]]>

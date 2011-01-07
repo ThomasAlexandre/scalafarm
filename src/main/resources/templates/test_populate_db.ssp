@@ -1,0 +1,93 @@
+<%@ val outputPackageBase:String %>
+<%@ val datasets:List[String] %>
+#import(se.ta.scalafarm.util.StringUtil.camelify)
+package ${outputPackageBase}.model
+
+import org.junit.Test
+import org.junit.Before
+import org.junit.After
+import org.junit.Assert._
+import javax.persistence._
+import org.dbunit.database.DatabaseConnection
+import org.dbunit.dataset.xml.FlatXmlDataSetBuilder
+import org.dbunit.operation.DatabaseOperation
+import java.io.FileInputStream
+import java.sql.DriverManager
+import net.lag.configgy.Configgy
+import ${outputPackageBase}.util.PersistenceUnit
+
+class TestPopulateDB {
+
+  private val DEFAULT_ENVIRONMENT = "demo"
+  private val DEFAULT_DATABASE_NAME = "sample"
+  private val DEFAULT_PERSISTENCE_UNIT_NAME = "jpaweb-network"
+  private val PERSISTENCE_XML_FILE_LOCATION = "src/main/resources/META-INF/persistence.xml"
+  private val TEST_CONFIG_FILE_LOCATION = "src/test/resources/META-INF/test.config"
+  var entityManagerFactory : EntityManagerFactory = _
+
+  @Before
+  def initEntityManagerFactory () = {
+    // load configuration data
+    Configgy.configure(TEST_CONFIG_FILE_LOCATION)
+    val config = Configgy.config
+    val environment = config.getString("environment").getOrElse(DEFAULT_ENVIRONMENT)
+    val database = config.getString("environments."+environment+".database",DEFAULT_DATABASE_NAME)
+    val datasets = config.getList("environments."+environment+".datasets")
+    val persistenceUnitName = config.getString("environments."+environment+".persistence_unit",DEFAULT_PERSISTENCE_UNIT_NAME)
+    val persistenceUnitProperties = PersistenceUnit(persistenceUnitName,PERSISTENCE_XML_FILE_LOCATION).readProperties
+    println("Persistence Unit Properties : "+persistenceUnitProperties)
+
+    try {
+      entityManagerFactory = Persistence.createEntityManagerFactory(persistenceUnitName)
+    } catch {
+      case e: Exception => {
+          def printAndDescend(ex : Throwable) : Unit = {
+            println(e.getMessage())
+            if (ex.getCause() != null) {
+              printAndDescend(ex.getCause())
+            }
+          }
+          printAndDescend(e)
+        }
+    }
+
+    // Retrieve connection
+    Class.forName(persistenceUnitProperties("hibernate.connection.driver_class"))
+    val connection = new DatabaseConnection(
+      DriverManager.getConnection(persistenceUnitProperties("hibernate.connection.url"),
+                                  persistenceUnitProperties("hibernate.connection.username"),
+                                  persistenceUnitProperties("hibernate.connection.password")
+      )
+    )
+
+    // Load testdata via DBUnit
+    val tranformedPackage = "${outputPackageBase}".replace('.','/')
+    val testDataDirectory = "src/test/scala/"+tranformedPackage+"/model/"+database
+    try {
+      datasets.foreach { dataset =>
+        val data = new FlatXmlDataSetBuilder().build(new FileInputStream(testDataDirectory+"/"+dataset+".xml"))
+        DatabaseOperation.CLEAN_INSERT.execute(connection, data)
+      }
+    } finally {
+      connection.close()
+    }
+  }
+
+  @After
+  def closeEntityManagerFactory () = {
+    if (entityManagerFactory != null) entityManagerFactory.close()
+  }
+
+  @Test
+  def loadStuff () = {
+    var entityManager = entityManagerFactory.createEntityManager()
+    val retrieved = entityManager
+    .createNamedQuery("findAllCustomers")
+    .getResultList()
+    .asInstanceOf[java.util.List[${camelify(datasets.head.toLowerCase)}]]
+
+    println("Found " + retrieved.get(0))
+    entityManager.close()
+  }
+}
+

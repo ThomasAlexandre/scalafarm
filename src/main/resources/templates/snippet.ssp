@@ -1,0 +1,147 @@
+<%@ val outputPackageBase:String %>
+<%@ val tableName:String %>
+<%@ val properties:List[Tuple3[String,String,Boolean]] %>
+<%@ val manyToOne:Map[String,List[Tuple3[String,String,String]]] %>
+#import(se.ta.scalafarm.util.StringUtil.camelify)
+#import(se.ta.scalafarm.util.StringUtil.camelifyMethod)
+<% val className = camelify(tableName.toLowerCase) %>
+<% val variableName = camelifyMethod(tableName.toLowerCase) %>
+<% val htmlDir = camelify(tableName).toLowerCase %>
+package ${outputPackageBase} {
+package snippet {
+
+import _root_.java.text.{ParseException,SimpleDateFormat}
+import _root_.scala.xml.{NodeSeq,Text}
+import _root_.net.liftweb.http.{RequestVar,S,SHtml}
+import _root_.net.liftweb.common.{Box,Empty,Full, Loggable}
+import _root_.net.liftweb.util.{Helpers}
+import S._
+import Helpers._
+import _root_.javax.persistence.{EntityExistsException,PersistenceException}
+import ${outputPackageBase}.model._
+import Model._
+
+// Make an object so that other pages can access
+object ${className}Ops {
+  // Object to hold search results
+  object resultVar extends RequestVar[List[${className}]](Nil)
+}
+
+class ${className}Ops extends Loggable {
+  val formatter = new _root_.java.text.SimpleDateFormat("yyyyMMdd")
+
+  def list (xhtml : NodeSeq) : NodeSeq = {
+    val ${variableName}s = Model.createNamedQuery[${className}]("findAll${className}s").getResultList()
+
+    ${variableName}s.flatMap(${variableName} =>
+      bind("${variableName.toLowerCase}", xhtml,#for (i <- 0 to properties.size-1) #if (manyToOne.keys.contains(properties(i)._1))
+           "${properties(i)._1}" -> Text(${variableName}.${manyToOne(properties(i)._1).head._2}.${manyToOne(properties(i)._1).head._3}.toString), 
+#else #match (properties(i)._2) 
+#case("Int")
+           "${properties(i)._1}" -> Text(${variableName}.${properties(i)._1}.toString),        
+#case("String")           
+           "${properties(i)._1}" -> Text(${variableName}.${properties(i)._1}),
+#case("Date")
+           "${properties(i)._1}" -> Text(formatter.format(${variableName}.${properties(i)._1})),
+#otherwise
+           Did not recognize property type #end #end #end
+           "edit" -> SHtml.link("add.html", () => requestVar(request), Text(?("Edit")))
+        )
+      )
+  }
+
+  // Set up a requestVar to track the book object for edits and adds
+  object requestVar extends RequestVar(new ${className}())
+  def request = requestVar.is
+
+  /*
+  // Utility methods for processing a submitted form
+  def is_valid_Book_? (toCheck : ${className}) : Boolean =
+    List((if (toCheck.title.length == 0) { S.error("You must provide a title"); false } else true),
+	 (if (toCheck.published == null) { S.error("You must provide a publish date"); false } else true),
+	 (if (toCheck.genre == null) { S.error("You must select a genre"); false } else true),
+	 (if (toCheck.author == null) { S.error("You must select an author"); false } else true)).forall(_ == true)
+  */
+
+
+  def is_valid_${className}_? (toCheck : ${className}) : Boolean =
+    List(true,true).forall(_ == true)  // replace elements in the List with your validations
+
+  // The add snippet method
+  def add (xhtml : NodeSeq) : NodeSeq = {
+    def doAdd () =
+      if (is_valid_${className}_?(request)) {
+	try {
+	  Model.mergeAndFlush(request)
+	  redirectTo("list.html")
+	} catch {
+	  case ee : EntityExistsException => error("That entity already exists.")
+	  case pe : PersistenceException => error("Error adding entity"); logger.error("${className} add failed", pe)
+	}
+      }
+
+
+    // Hold a val here so that the closure holds it when we re-enter this method
+    val current = request
+
+    val ${variableName}s = Model.createNamedQuery[${className}]("findAll${className}s").getResultList()
+    //val choices = ${variableName}s.map(item => (item.id.toString -> item.name)).toList
+    //val default = if (book.author != null) { Full(book.author.id.toString) } else { Empty }
+    val default = Empty
+
+    bind("${variableName.toLowerCase}", xhtml,#for (i <- 0 to properties.size-1)
+#if(properties(i)._3)
+         "${properties(i)._1}" -> SHtml.hidden(() => requestVar(current)),
+#elseif(manyToOne.keys.contains(properties(i)._1))
+         "${properties(i)._1}" -> Text(request.${manyToOne(properties(i)._1).head._2}.${manyToOne(properties(i)._1).head._3}.toString),
+         //"${properties(i)._1}" -> Text(request.${properties(i)._1}.${manyToOne(properties(i)._1).head._3}),
+/*
+         "count" -> SHtml.link("/${htmlDir}/search.html", {() =>
+	     ${className}Ops.resultVar(Model.createNamedQuery[${className}]("find${className}sByAuthor", "id" ->author.id).getResultList().toList)
+	     }, Text(author.books.size().toString)),
+*/
+#else #match (properties(i)._2) 
+#case("Int")
+         "${properties(i)._1}" -> Text(request.${properties(i)._1}.toString), 
+#case("String")
+         "${properties(i)._1}" -> SHtml.text(request.${properties(i)._1}, request.${properties(i)._1} = _),
+#case("Date")
+         // "${properties(i)._1}" -> SHtml.text(request.${properties(i)._1}, request.${properties(i)._1} = _),
+         // "${properties(i)._1}" -> SHtml.text(formatter.format(request.${properties(i)._1}),setDate(_, request)) % ("id" -> "${properties(i)._1}"),
+         "${properties(i)._1}" -> SHtml.text(formatter.format(request.${properties(i)._1}),{ input => request.${properties(i)._1} = formatter.parse(input)}),
+#otherwise
+         Did not recognize property type
+#end #end #end
+         "save" -> SHtml.submit(?("Save"), doAdd))
+/*
+    bind("book", xhtml,
+	 "id" -> SHtml.hidden(() => bookVar(current)),
+	 "title" -> SHtml.text(book.title, book.title = _),
+	 "published" -> SHtml.text(formatter.format(book.published), setDate(_, book)) % ("id" -> "published"),
+	 "genre" -> SHtml.select(Genre.getNameDescriptionList, (Box.legacyNullTest(book.genre).map(_.toString) or Full("")), choice => book.genre = Genre.valueOf(choice).getOrElse(null)),
+	 "author" -> SHtml.select(choices, default, {authId : String => book.author = Model.getReference(classOf[Author], authId.toLong)}),
+	 "save" -> SHtml.submit(?("Save"), doAdd))
+*/
+  }
+
+  /*
+  def searchResults (xhtml : NodeSeq) : NodeSeq = ${className}Ops.resultVar.is.flatMap(result =>
+    bind("result", xhtml, 
+         "title" -> Text(result.title), 
+         "author" -> Text(result.author.name)))
+
+  def search (xhtml : NodeSeq) : NodeSeq = {
+    var title = ""
+
+    def doSearch () = {
+      ${className}Ops.resultVar(Model.createNamedQuery[Book]("findBooksByTitle", "title" -> ("%" + title.toLowerCase + "%")).getResultList().toList)
+    }
+
+    bind("search", xhtml,
+       "title" -> SHtml.text(title, x => title = x),
+       "run" -> SHtml.submit(?("Search"), doSearch _))
+  }
+  */
+}
+}
+}

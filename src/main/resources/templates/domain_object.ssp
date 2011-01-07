@@ -1,0 +1,28 @@
+<%@ val outputPackageBase:String %>
+<%@ val tableName:String %>
+<%@ val properties:List[Tuple6[String,String,String,String,Int,String]] %>
+<%@ val manyToOne:Map[String,List[Tuple2[String,String]]] %>
+<%@ val primaryKeys:List[String] %>
+<%@ val oneToMany:List[Tuple3[String,String,String]] %>
+#import(se.ta.scalafarm.util.StringUtil.camelify)
+package ${outputPackageBase}.model {
+
+  import _root_.java.util._
+  import _root_.javax.persistence._
+
+  @Entity
+  @Table(name="${tableName}")
+  class ${camelify(tableName.toLowerCase)} {
+#for (i <- 0 to properties.size-1) #if (properties(i)._2 == "Date")   
+    @Temporal(TemporalType.DATE)#end 
+#if (manyToOne.keys.contains(properties(i)._1))    @ManyToOne(optional = false)
+    var ${manyToOne(properties(i)._1).head._2} : ${camelify(manyToOne(properties(i)._1).head._2)} = _  #elseif (primaryKeys.contains(properties(i)._1))    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column( name="${properties(i)._6}") 
+    var ${properties(i)._1} : ${properties(i)._2} = _ #else    @Column( name="${properties(i)._6}", unique=${properties(i)._4}, nullable=${properties(i)._3}, length=${properties(i)._5} ) 
+    var ${properties(i)._1} : ${properties(i)._2} = #match (properties(i)._2) #case("Date")new Date() #case("Int")0 #otherwise "" #end #end 
+#end #for (i <- 0 to oneToMany.size-1)
+    @OneToMany(mappedBy = "${oneToMany(i)._2}", targetEntity = classOf[${oneToMany(i)._3}])
+    var ${oneToMany(i)._1}Collection : _root_.java.util.Set[${oneToMany(i)._3}] = new _root_.java.util.HashSet[${oneToMany(i)._3}]() #end
+  }
+}

@@ -1,0 +1,24 @@
+-@ val outputPackageBase: String ="defaultpackage"
+-@ val className: String = "defaultclassname"
+-@ val properties: List[Tuple3[String,String,Boolean]] = Nil
+%lift:surround{:with => "default",
+               :at   => "content"}
+  %head
+    %title<
+      %lift:loc Add #{className}
+
+  %table
+    %lift:snippet{:type => {className+"Ops.add"},
+                  :form => "post"}
+      %tr
+        = properties.foreach
+          - elem =>
+            = if(elem._3) {"<"+className.toLowerCase+":"+elem._1+"/>"} else
+              %td<
+                %label<
+                  %lift:loc #{elem._1}
+              %td<
+                <#{className.toLowerCase+":"+elem._1}/>
+      %tr 
+        %td< 
+          <#{className.toLowerCase+":save"}/>

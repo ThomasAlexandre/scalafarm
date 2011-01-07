@@ -1,0 +1,23 @@
+-@ val outputPackageBase: String ="defaultpackage"
+-@ val className: String
+-@ val properties: List[Tuple3[String,String,String]] = Nil
+%lift:surround{:with => "default",
+               :at   => "content"}
+  %head<
+    %title<
+      %lift:loc #{className} List
+
+  %table
+    %tr
+      = properties.foreach
+        - elem =>
+          %th<
+            %lift:loc #{elem._1}
+    %lift:snippet(type={className+"Ops.list"})
+      %tr
+        = properties.foreach
+          - elem =>
+            %td<
+              <#{className.toLowerCase+":"+elem._1}/>
+    %a{:href => "add"}
+      %lift:loc Add

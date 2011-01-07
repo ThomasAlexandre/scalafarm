@@ -1,0 +1,30 @@
+<%@ val outputPackageBase:String %>
+package ${outputPackageBase}.util
+
+import scala.xml.XML
+import scala.xml.NodeSeq
+import java.io.File
+import scala.collection._
+
+case class PersistenceUnit(name:String,location:String) {
+
+  private def loadPersistenceUnitAsXML():NodeSeq = {
+    XML.loadFile(location) \ "persistence-unit" filter { element =>
+      (element \ "@name").text == name
+    }
+  }
+
+  def readProperties() = {
+    val properties = mutable.Map[String,String]()
+    (loadPersistenceUnitAsXML() \\ "property") .toList.map { property =>
+      val key = (property \ "@name").text
+      val value = (property \ "@value").text
+      properties += key->value
+    }
+    properties
+  }
+
+  override def toString():String = {
+    "["+name+"]"
+  }
+}

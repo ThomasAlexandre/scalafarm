@@ -1,0 +1,16 @@
+<%@ val outputPackageBase:String %>
+<%@ val className:String %>
+package ${outputPackageBase}.model
+
+/*
+ * Exposes API to manage models. 
+ */
+object ${className}Model {
+
+  def findAll${className}s() = {
+    Model.createNamedQuery[${className}]("findAll${className}s").getResultList()
+  }
+}
+
+
+
